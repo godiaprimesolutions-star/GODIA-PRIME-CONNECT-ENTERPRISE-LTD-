@@ -1,0 +1,18 @@
+name = "godia-prime-connect-enterprise-ltd"
+main = "src/index.js"
+compatibility_date = "2026-10-14"
+
+# Serves the existing frontend files. API requests are handled by src/index.js.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+# SECURITY / DATABASE SETUP:
+# No D1 database ID is guessed or included here. After confirming the correct
+# database in Cloudflare, add its real binding in Cloudflare Settings > Bindings
+# or add a [[d1_databases]] section using the real name and ID.
+
+[vars]
+# Replace * with the exact frontend origin before production if using a separate domain.
+ALLOWED_ORIGINS = "*"
