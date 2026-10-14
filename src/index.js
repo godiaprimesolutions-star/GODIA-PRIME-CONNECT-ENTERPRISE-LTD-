@@ -883,12 +883,16 @@ async function handle(request, env) {
     message: 'API endpoint not implemented yet.'
   }, 404, headers);
 }
-
 export default {
   async fetch(request, env) {
     try {
       return await handle(request, env);
     } catch (error) {
+      console.error(
+        'GPC unhandled Worker error:',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+
       return json({
         ok: false,
         message: 'Unexpected server error. Check Worker logs.'
