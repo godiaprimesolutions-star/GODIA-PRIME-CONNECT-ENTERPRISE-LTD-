@@ -5,7 +5,7 @@ const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(d
     'cache-control': 'no-store',
     ...headers
   }
-});
+}); 
 
 const nowIso = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
