@@ -36,7 +36,7 @@ async function derive(secret, salt) {
   return hex(await crypto.subtle.deriveBits({
     name: 'PBKDF2',
     salt: utf8(salt),
-    iterations: 120000,
+    iterations: 100000,
     hash: 'SHA-256'
   }, key, 256));
 }
