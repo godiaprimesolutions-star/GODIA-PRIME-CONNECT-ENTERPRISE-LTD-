@@ -389,10 +389,12 @@ async function handle(request, env) {
         userId,
         { role: 'customer' }
       );
-    } catch (e) {
+        } catch (e) {
+      console.error('GPC registration failed:', e instanceof Error ? e.message : 'Unknown registration error');
+
       return json({
         ok: false,
-        message: 'Could not create the account. Check that the migration was applied and try again.'
+        message: 'Could not create the account. Check Worker logs for the registration error.'
       }, 500, headers);
     }
 
