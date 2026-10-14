@@ -2,8 +2,9 @@ name = "godia-prime-connect-enterprise-ltd"
 main = "src/index.js"
 compatibility_date = "2026-10-14"
 
-# Serves the existing frontend files. API requests are handled by src/index.js.
-Connect the existing D1 database.[assets]
+Serves the existing frontend files. API requests are handled by src/index.js.
+
+[assets]
 directory = "./public"
 binding = "ASSETS"
 run_worker_first = ["/api/*"]
