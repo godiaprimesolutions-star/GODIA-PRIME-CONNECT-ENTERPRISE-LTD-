@@ -2,7 +2,7 @@ name = "godia-prime-connect-enterprise-ltd"
 main = "src/index.js"
 compatibility_date = "2026-10-14"
 
-Serve the existing GODIA frontend.
+#Serve the existing GODIA frontend.
 
 [assets]
 directory = "./public"
