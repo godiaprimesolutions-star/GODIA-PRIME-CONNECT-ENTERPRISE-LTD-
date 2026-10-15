@@ -596,7 +596,7 @@ async function handle(request, env) {
     }, 200, headers);
   }
 
-  if (
+    if (
     path === '/api/subscription/access' &&
     request.method === 'GET'
   ) {
@@ -609,6 +609,7 @@ async function handle(request, env) {
       }, 401, headers);
     }
 
+    // The platform owner is exempt from subscription restrictions.
     if (user.role === 'owner') {
       return json({
         ok: true,
@@ -620,42 +621,110 @@ async function handle(request, env) {
     }
 
     try {
-      const row = await env.DB.prepare(`
+      const now = nowIso();
+
+      // Check whether the owner has set a temporary access override.
+      const override = await env.DB.prepare(`
         SELECT mode, expires_at, reason
         FROM gpc_customer_plan_access
         WHERE user_id = ?
         LIMIT 1
       `).bind(user.id).first();
 
-      const active = !!(
-        row &&
-        row.expires_at &&
-        Date.parse(row.expires_at) > Date.now()
+      const overrideActive = !!(
+        override &&
+        override.expires_at &&
+        Date.parse(override.expires_at) > Date.now()
       );
 
-      const mode = active ? row.mode : null;
+      // An active owner-issued lock takes priority.
+      if (overrideActive && override.mode === 'lock') {
+        return json({
+          ok: true,
+          role: user.role,
+          mode: 'lock',
+          allowed: false,
+          expires_at: override.expires_at,
+          source: 'server',
+          rule: 'owner_temporary_lock'
+        }, 200, headers);
+      }
 
+      // Preserve the owner's temporary free-access permission.
+      if (overrideActive && override.mode === 'grant_free') {
+        return json({
+          ok: true,
+          role: user.role,
+          mode: 'grant_free',
+          allowed: true,
+          expires_at: override.expires_at,
+          source: 'server',
+          rule: 'owner_temporary_free_access'
+        }, 200, headers);
+      }
+
+      // Verify that a subscription has a confirmed payment
+      // and has not expired or started in the future.
+      const subscription = await env.DB.prepare(`
+        SELECT
+          s.id,
+          s.plan_code,
+          s.starts_at,
+          s.expires_at
+        FROM gpc_subscriptions s
+        JOIN gpc_subscription_payments p
+          ON p.id = s.payment_id
+         AND p.user_id = s.user_id
+        WHERE s.user_id = ?
+          AND s.status = 'active'
+          AND s.starts_at <= ?
+          AND s.expires_at > ?
+          AND p.status = 'confirmed'
+          AND p.confirmed_at IS NOT NULL
+        ORDER BY s.expires_at DESC
+        LIMIT 1
+      `).bind(user.id, now, now).first();
+
+      if (subscription) {
+        return json({
+          ok: true,
+          role: user.role,
+          mode: 'subscription_active',
+          allowed: true,
+          plan_code: subscription.plan_code,
+          starts_at: subscription.starts_at,
+          expires_at: subscription.expires_at,
+          source: 'server',
+          rule: 'confirmed_active_subscription'
+        }, 200, headers);
+      }
+
+      // No qualifying paid subscription was found.
       return json({
         ok: true,
         role: user.role,
-        mode,
-        allowed: mode !== 'lock',
-        expires_at: active ? row.expires_at : null,
+        mode: 'lock',
+        allowed: false,
+        expires_at: null,
         source: 'server',
-        rule: mode === 'grant_free'
-          ? 'temporary_free_access'
-          : mode === 'lock'
-            ? 'temporary_lock'
-            : 'normal_plan_rules'
+        rule: 'subscription_required',
+        message: 'An active, confirmed subscription is required to access protected features.'
       }, 200, headers);
-    } catch (e) {
+
+    } catch (error) {
+      console.error(
+        'GPC subscription access check failed:',
+        error instanceof Error
+          ? error.message
+          : 'Unknown subscription access error'
+      );
+
       return json({
         ok: false,
-        message: 'Customer access migration is not applied. Temporary access status cannot be verified.'
+        message: 'Subscription access could not be verified.'
       }, 503, headers);
     }
   }
-
   if (
     path === '/api/owner/customer-access' &&
     ['GET', 'POST'].includes(request.method)
