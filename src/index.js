@@ -283,9 +283,10 @@ async function handle(request, env) {
     ['/api/admin/health', 'GET'],
     ['/api/owner/customer-access', 'GET'],
     ['/api/owner/customer-access', 'POST'],
-    ['/api/subscription/access', 'GET']
-  ]);
-
+    ['/api/subscription/access', 'GET'],
+['/api/subscription/mpesa/stkpush', 'POST'],
+['/api/subscription/mpesa/callback', 'POST']
+]);
   if (
     !(path === '/api/owner/customer-access' &&
       ['GET', 'POST'].includes(request.method)) &&
