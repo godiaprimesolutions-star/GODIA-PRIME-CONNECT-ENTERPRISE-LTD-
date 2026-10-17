@@ -1,0 +1,45 @@
+GODIA PRIME CONNECT — UPDATE PACKAGE
+
+FILES IN THIS PACKAGE
+- public/index.html: frontend update based on the supplied Cashless Orders V1 file, with camera scanner and customer-message preview changes.
+- src/index.js: existing Worker API preserved; adds authenticated STK Push and payment-status endpoints, plus Daraja callback handler.
+- migrations/0003_mpesa_stk_payments.sql: additive payment table migration. It does not delete or reset existing tables.
+- package.json and wrangler.toml: supplied project configuration retained.
+
+IMPORTANT: Do not overwrite the whole repository with this small patch package. Upload/replace the files at the matching paths in your EXISTING repository. Keep a backup/commit first. The HTML was based on the user-supplied GODIA_PRIME_CONNECT_CASHLESS_ORDERS_V1.html file; confirm it includes all current frontend features before replacing public/index.html.
+
+CLOUDFLARE D1
+1. Apply migrations/0003_mpesa_stk_payments.sql to the SAME existing D1 database used by this Worker. Do not create a new DB and do not run destructive reset commands.
+2. Ensure the Worker still has its DB binding pointing to that same database.
+
+WORKER SECRETS / VARIABLES
+Configure these in Cloudflare Worker settings; never commit secret values to GitHub:
+- DARAJA_CONSUMER_KEY (secret)
+- DARAJA_CONSUMER_SECRET (secret)
+- DARAJA_PASSKEY (secret)
+- DARAJA_SHORTCODE (variable; business shortcode/till configuration approved for the Daraja product)
+- DARAJA_CALLBACK_URL (variable; public HTTPS URL ending /api/payments/mpesa/callback)
+- DARAJA_ENV = sandbox for initial testing; production only after successful sandbox testing and Safaricom approval
+- DARAJA_TRANSACTION_TYPE = CustomerPayBillOnline for PayBill. Use CustomerBuyGoodsOnline only when the Daraja shortcode/product and account are configured for Buy Goods/Till and Safaricom permits it.
+
+The callback URL must be publicly reachable over HTTPS. Configure the exact callback URL in the Daraja application as required. The app must not display a payment as successful until a callback confirms ResultCode 0. This package records callback outcomes; it does not yet activate subscriptions or mark unrelated POS sales as paid. Do not treat an STK request accepted response as proof of payment.
+
+ENDPOINTS
+POST /api/payments/mpesa/stkpush (requires existing bearer session)
+Body: {"amount": 5, "phone": "0712345678", "account_reference": "GODIA", "description": "POS payment"}
+GET /api/payments/mpesa/status?checkout_request_id=... (requires same user's bearer session)
+POST /api/payments/mpesa/callback (Daraja callback; no user session)
+
+TESTS PERFORMED ON THIS PACKAGE
+- Worker JavaScript syntax check (node --check).
+- SQL migration syntax/execution against a temporary SQLite schema matching the required gpc_users foreign key.
+- ZIP integrity check.
+- Frontend inline JavaScript syntax checks and previous small customer-message smoke test.
+
+NOT PERFORMED
+- No live Daraja credentials or real STK Push test.
+- No live callback delivery verification.
+- No Cloudflare deployment or live D1 migration performed.
+- No physical Android camera test.
+- No automatic SMS delivery.
+- Subscription activation and reconciliation are not included in this first Daraja patch; payment success is stored separately pending the business rules and product plan mapping.
