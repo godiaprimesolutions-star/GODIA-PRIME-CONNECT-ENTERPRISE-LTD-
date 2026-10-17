@@ -1,19 +1,19 @@
 name = "godia-prime-connect-enterprise-ltd"
 main = "src/index.js"
 compatibility_date = "2026-10-14"
-Serves the existing frontend files. API requests are handled by src/index.js.
+#Serves the existing frontend files. API requests are handled by src/index.js.
 [assets]
 directory = "./public"
 binding = "ASSETS"
 run_worker_first = ["/api/*"]
-Connect Cloudflare Workers AI.
+#Connect Cloudflare Workers AI.
 [ai]
 binding = "AI"
-Connect the existing Cloudflare D1 database.
+#Connect the existing Cloudflare D1 database.
 [[d1_databases]]
 binding = "DB"
 database_name = "godia-prime-connect-enterprise-db"
 database_id = "da851211-d723-4489-94b9-e50eae19ce0c"
-Runtime configuration.
+#Runtime configuration.
 [vars]
 ALLOWED_ORIGINS = "*"
