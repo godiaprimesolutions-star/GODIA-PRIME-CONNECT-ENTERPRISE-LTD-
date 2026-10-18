@@ -1,0 +1,16 @@
+name = "godia-prime-connect-api"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+ENVIRONMENT = "production"
+# After deploying the Pages site, set ALLOWED_ORIGINS to its exact origin(s), comma-separated.
+# Example: ALLOWED_ORIGINS = "https://your-project.pages.dev,https://your-domain.com"
+ALLOWED_ORIGINS = "*"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "godia-prime-connect-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "migrations"
