@@ -6,7 +6,6 @@ const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(d
     ...headers
   }
 });
-
 const nowIso = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
 
