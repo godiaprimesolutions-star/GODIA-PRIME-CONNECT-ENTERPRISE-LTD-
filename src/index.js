@@ -1,4 +1,4 @@
-const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), {
+⁸const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), {
   status,
   headers: {
     'content-type': 'application/json; charset=utf-8',
@@ -1311,15 +1311,25 @@ Security and accuracy rules:
     message: 'API endpoint not implemented yet.'
   }, 404, headers);
 }
-
 export default {
   async fetch(request, env) {
     try {
       return await handle(request, env);
-    } catch {
+    } catch (error) {
+      const errorId = crypto.randomUUID();
+
+      console.error('GODIA PRIME API ERROR', {
+        errorId,
+        path: new URL(request.url).pathname,
+        method: request.method,
+        errorName: error?.name || 'UnknownError',
+        errorMessage: String(error?.message || 'Unknown error')
+      });
+
       return json({
         ok: false,
-        message: 'Unexpected server error. Check Worker logs.'
+        message: 'Unexpected server error. Check Worker logs.',
+        errorId
       }, 500, cors(request, env));
     }
   }
