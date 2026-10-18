@@ -865,11 +865,11 @@ Security and accuracy rules:
     }, 201, headers);
   }
 
-  // Login
+    // Login
   if (path === '/api/auth/login' && request.method === 'POST') {
     const data = await bodyJson(request);
 
-    if (!data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       return json({
         ok: false,
         message: 'Invalid JSON body.'
@@ -878,7 +878,7 @@ Security and accuracy rules:
 
     const email = String(data.email || '').trim().toLowerCase();
     const phone = normalizePhone(data.phone);
-    const byEmail = !!email;
+    const byEmail = email.length > 0;
 
     if (byEmail ? !validEmail(email) : !validPhone(phone)) {
       return json({
@@ -887,77 +887,134 @@ Security and accuracy rules:
       }, 400, headers);
     }
 
-    const key = await digest(byEmail ? 'email:' + email : 'phone:' + phone);
+    const key = await digest(
+      byEmail ? 'email:' + email : 'phone:' + phone
+    );
 
-    const attempt = await env.DB.prepare(
-      'SELECT * FROM gpc_login_attempts WHERE attempt_key=?'
-    ).bind(key).first();
+    try {
+      const attempt = await env.DB.prepare(
+        'SELECT * FROM gpc_login_attempts WHERE attempt_key=?'
+      ).bind(key).first();
 
-    if (attempt?.blocked_until && Date.parse(attempt.blocked_until) > Date.now()) {
-      return json({
-        ok: false,
-        message: 'Too many attempts. Please wait 15 minutes before trying again.'
-      }, 429, headers);
-    }
-
-    const user = await env.DB.prepare(
-      'SELECT * FROM gpc_users WHERE ' +
-      (byEmail ? 'email=?' : 'phone=?') +
-      ' LIMIT 1'
-    ).bind(byEmail ? email : phone).first();
-
-    let valid = false;
-
-    if (user && user.status === 'active') {
-      if (byEmail && typeof data.password === 'string') {
-        valid = same(
-          await derive(data.password, user.password_salt),
-          user.password_hash
-        );
-      } else if (
-        !byEmail &&
-        typeof data.pin === 'string' &&
-        /^\d{4,8}$/.test(data.pin)
+      if (
+        attempt?.blocked_until &&
+        Date.parse(attempt.blocked_until) > Date.now()
       ) {
-        valid = same(
-          await derive(data.pin, user.pin_salt),
-          user.pin_hash
-        );
+        return json({
+          ok: false,
+          message: 'Too many attempts. Please wait 15 minutes before trying again.'
+        }, 429, headers);
       }
-    }
 
-    if (!valid) {
-      await failAttempt(env.DB, key);
+      let user;
+
+      if (byEmail) {
+        user = await env.DB.prepare(
+          'SELECT * FROM gpc_users WHERE lower(email)=? LIMIT 1'
+        ).bind(email).first();
+      } else {
+        const kenyaPhone = normalizeKenyanPhone(phone);
+        const candidates = new Set([phone]);
+
+        if (kenyaPhone) {
+          candidates.add(kenyaPhone);
+          candidates.add('+' + kenyaPhone);
+
+          if (kenyaPhone.startsWith('254')) {
+            candidates.add('0' + kenyaPhone.slice(3));
+          }
+        }
+
+        const placeholders = [...candidates].map(() => '?').join(',');
+
+        user = await env.DB.prepare(
+          'SELECT * FROM gpc_users WHERE phone IN (' +
+          placeholders +
+          ') LIMIT 1'
+        ).bind(...candidates).first();
+      }
+
+      let valid = false;
+
+      if (user && user.status === 'active') {
+        if (byEmail && typeof data.password === 'string') {
+          valid = same(
+            await derive(data.password, user.password_salt),
+            user.password_hash
+          );
+        } else if (
+          !byEmail &&
+          typeof data.pin === 'string' &&
+          /^\d{4,8}$/.test(data.pin)
+        ) {
+          valid = same(
+            await derive(data.pin, user.pin_salt),
+            user.pin_hash
+          );
+        }
+      }
+
+      if (!valid) {
+        await failAttempt(env.DB, key);
+
+        return json({
+          ok: false,
+          message: 'The sign-in details are incorrect or the account is not active.'
+        }, 401, headers);
+      }
+
+      const session = await newSession(env.DB, user.id);
+
+      try {
+        await clearAttempts(env.DB, key);
+      } catch (error) {
+        console.error('Login attempt cleanup failed:', error?.message);
+      }
+
+      try {
+        await audit(
+          env.DB,
+          user.id,
+          'account.login',
+          'session',
+          null,
+          { role: user.role }
+        );
+      } catch (error) {
+        console.error('Login audit failed:', error?.message);
+      }
+
+      return json({
+        ok: true,
+        success: true,
+        token: session.token,
+        expiresAt: session.expiresAt,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          status: user.status
+        }
+      }, 200, headers);
+
+    } catch (error) {
+      const errorId = crypto.randomUUID();
+
+      console.error('GODIA LOGIN ERROR', {
+        errorId,
+        errorName: error?.name || 'UnknownError',
+        errorMessage: String(error?.message || 'Unknown error')
+      });
 
       return json({
         ok: false,
-        message: 'The sign-in details are incorrect or the account is not active.'
-      }, 401, headers);
+        message: 'Login could not be completed. Please try again.',
+        errorId
+      }, 500, headers);
     }
-
-    await clearAttempts(env.DB, key);
-
-    const session = await newSession(env.DB, user.id);
-
-    await audit(env.DB, user.id, 'account.login', 'session', null);
-
-    return json({
-      ok: true,
-      success: true,
-      token: session.token,
-      expiresAt: session.expiresAt,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        status: user.status
-      }
-    }, 200, headers);
-  }
-
-  // Logout
+      } // Logout
   if (path === '/api/auth/logout' && request.method === 'POST') {
     const user = await getUser(request, env.DB);
 
