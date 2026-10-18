@@ -851,12 +851,21 @@ Security and accuracy rules:
       await audit(env.DB, userId, 'account.registered', 'user', userId, {
         role: 'customer'
       });
-    } catch {
-      return json({
-        ok: false,
-        message: 'Could not create the account. Check that the migration was applied and try again.'
-      }, 500, headers);
-    }
+    } catch (error) {
+const errorId = crypto.randomUUID();
+
+  console.error('GODIA REGISTRATION ERROR', {
+    errorId,
+    errorName: error?.name || 'UnknownError',
+    errorMessage: String(error?.message || 'Unknown error')
+  });
+
+  return json({
+    ok: false,
+    message: 'Account registration failed. Check the Worker logs.',
+    errorId
+  }, 500, headers);
+}
 
     return json({
       ok: true,
