@@ -1,0 +1,12 @@
+{
+  "name": "godia-prime-connect-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GODIA PRIME CONNECT frontend for GitHub and Cloudflare Pages",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
