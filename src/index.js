@@ -1,4 +1,4 @@
-const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), {
+const json = (data, status = 200, headers = {}) => new Response(, {
   status,
   headers: {
     'content-type': 'application/json; charset=utf-8',
